@@ -1,23 +1,18 @@
 import React, { useState } from 'react';
 import { Menu, Search, Bell, User, ChevronDown, Building2, LogOut } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useBranches } from '../../hooks/useDatabase';
 
 interface HeaderProps {
   onToggleSidebar: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, currentBranch, setCurrentBranch } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showBranchSelector, setShowBranchSelector] = useState(false);
 
-  const branches = [
-    { id: '1', name: 'Main Branch', city: 'New York' },
-    { id: '2', name: 'Downtown', city: 'Los Angeles' },
-    { id: '3', name: 'Uptown', city: 'Chicago' },
-  ];
-
-  const [selectedBranch, setSelectedBranch] = useState(branches[0]);
+  const { data: branches = [] } = useBranches();
 
   return (
     <header className="bg-white border-b border-gray-200 px-4 py-3">
@@ -36,7 +31,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
               className="flex items-center space-x-2 px-3 py-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
             >
               <Building2 className="w-4 h-4 text-gray-600" />
-              <span className="text-sm font-medium text-gray-700">{selectedBranch.name}</span>
+              <span className="text-sm font-medium text-gray-700">{currentBranch?.name || 'Select Branch'}</span>
               <ChevronDown className="w-4 h-4 text-gray-400" />
             </button>
 
@@ -48,11 +43,11 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
                     <button
                       key={branch.id}
                       onClick={() => {
-                        setSelectedBranch(branch);
+                        setCurrentBranch(branch);
                         setShowBranchSelector(false);
                       }}
                       className={`w-full text-left px-2 py-2 rounded-md hover:bg-gray-50 transition-colors ${
-                        selectedBranch.id === branch.id ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700'
+                        currentBranch?.id === branch.id ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700'
                       }`}
                     >
                       <div className="font-medium">{branch.name}</div>

@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { Search, ShoppingCart, CreditCard, DollarSign, Percent, Trash2, Plus, Minus } from 'lucide-react';
+import { useProducts, useCustomers, useCreateOrder } from '../../hooks/useDatabase';
+import { useAuth } from '../../contexts/AuthContext';
+import toast from 'react-hot-toast';
 
 interface CartItem {
   id: string;
@@ -10,35 +13,25 @@ interface CartItem {
   total: number;
 }
 
-interface Product {
-  id: string;
-  sku: string;
-  name: string;
-  price: number;
-  stock: number;
-  category: string;
-}
-
-const sampleProducts: Product[] = [
-  { id: '1', sku: 'SKU-001', name: 'Wireless Headphones', price: 89.99, stock: 150, category: 'Electronics' },
-  { id: '2', sku: 'SKU-002', name: 'Coffee Beans', price: 24.99, stock: 75, category: 'Food' },
-  { id: '3', sku: 'SKU-003', name: 'Cotton T-Shirt', price: 19.99, stock: 200, category: 'Apparel' },
-  { id: '4', sku: 'SKU-004', name: 'Water Bottle', price: 29.99, stock: 5, category: 'Home' },
-];
-
 export const POSInterface: React.FC = () => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [discount, setDiscount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'digital'>('cash');
+  const [selectedCustomer, setSelectedCustomer] = useState<string>('');
 
-  const addToCart = (product: Product) => {
+  const { currentBranch } = useAuth();
+  const { data: products = [] } = useProducts({ search: searchTerm, active: true });
+  const { data: customers = [] } = useCustomers({ active: true });
+  const createOrder = useCreateOrder();
+
+  const addToCart = (product: any) => {
     setCart(prev => {
       const existingItem = prev.find(item => item.id === product.id);
       if (existingItem) {
         return prev.map(item =>
           item.id === product.id
-            ? { ...item, quantity: item.quantity + 1, total: (item.quantity + 1) * item.price }
+            ? { ...item, quantity: item.quantity + 1, total: (item.quantity + 1) * item.sale_price }
             : item
         );
       }
@@ -46,9 +39,9 @@ export const POSInterface: React.FC = () => {
         id: product.id,
         sku: product.sku,
         name: product.name,
-        price: product.price,
+        price: product.sale_price,
         quantity: 1,
-        total: product.price
+        total: product.sale_price
       }];
     });
   };
@@ -76,18 +69,42 @@ export const POSInterface: React.FC = () => {
   const tax = (subtotal - discountAmount) * 0.08; // 8% tax
   const total = subtotal - discountAmount + tax;
 
-  const filteredProducts = sampleProducts.filter(product =>
+  const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     product.sku.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleCheckout = () => {
     if (cart.length === 0) return;
-    
-    // Simulate checkout process
-    alert(`Order completed! Total: $${total.toFixed(2)}`);
-    setCart([]);
-    setDiscount(0);
+    if (!selectedCustomer) {
+      toast.error('Please select a customer');
+      return;
+    }
+    if (!currentBranch) {
+      toast.error('No branch selected');
+      return;
+    }
+
+    const orderData = {
+      customer_id: selectedCustomer,
+      branch_id: currentBranch.id,
+      notes: `POS Sale - ${paymentMethod} payment`,
+      lines: cart.map(item => ({
+        product_id: item.id,
+        qty: item.quantity,
+        unit_price: item.price,
+        discount_pct: 0,
+      }))
+    };
+
+    createOrder.mutate(orderData, {
+      onSuccess: () => {
+        toast.success(`Order completed! Total: $${total.toFixed(2)}`);
+        setCart([]);
+        setDiscount(0);
+        setSelectedCustomer('');
+      }
+    });
   };
 
   return (
@@ -121,13 +138,9 @@ export const POSInterface: React.FC = () => {
               <h3 className="font-medium text-gray-900 text-sm mb-1 line-clamp-2">{product.name}</h3>
               <p className="text-xs text-gray-500 mb-2">{product.sku}</p>
               <div className="flex items-center justify-between">
-                <span className="text-lg font-bold text-indigo-600">${product.price}</span>
-                <span className={`text-xs px-2 py-1 rounded-full ${
-                  product.stock > 10 ? 'bg-green-100 text-green-600' :
-                  product.stock > 0 ? 'bg-orange-100 text-orange-600' :
-                  'bg-red-100 text-red-600'
-                }`}>
-                  {product.stock} left
+                <span className="text-lg font-bold text-indigo-600">${product.sale_price}</span>
+                <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-600">
+                  In Stock
                 </span>
               </div>
             </button>
@@ -189,6 +202,23 @@ export const POSInterface: React.FC = () => {
 
         {cart.length > 0 && (
           <div className="border-t border-gray-200 p-6 space-y-4">
+            {/* Customer Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Customer</label>
+              <select
+                value={selectedCustomer}
+                onChange={(e) => setSelectedCustomer(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              >
+                <option value="">Select Customer</option>
+                {customers.map(customer => (
+                  <option key={customer.id} value={customer.id}>
+                    {customer.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Discount */}
             <div className="flex items-center space-x-2">
               <Percent className="w-4 h-4 text-gray-400" />
@@ -251,9 +281,14 @@ export const POSInterface: React.FC = () => {
             {/* Checkout Button */}
             <button
               onClick={handleCheckout}
+              disabled={cart.length === 0 || !selectedCustomer || createOrder.isPending}
               className="w-full bg-indigo-600 text-white py-4 rounded-lg hover:bg-indigo-700 transition-colors font-medium text-lg"
             >
-              Complete Sale - ${total.toFixed(2)}
+              {createOrder.isPending ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto" />
+              ) : (
+                `Complete Sale - $${total.toFixed(2)}`
+              )}
             </button>
           </div>
         )}

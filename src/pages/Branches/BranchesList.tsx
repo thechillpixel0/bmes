@@ -1,65 +1,94 @@
 import React, { useState } from 'react';
 import { Plus, Search, MapPin, Phone, User, MoreHorizontal, Edit, Trash2, Building2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useBranches, useCreateBranch, useUpdateBranch } from '../../hooks/useDatabase';
+import { Modal } from '../../components/UI/Modal';
+import { Button } from '../../components/UI/Button';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 
-interface Branch {
-  id: string;
-  name: string;
-  city: string;
-  state: string;
-  manager: string;
-  phone: string;
-  status: 'active' | 'inactive';
-  inventory_value: number;
-  sales_mtd: number;
-}
-
-const sampleBranches: Branch[] = [
-  {
-    id: '1',
-    name: 'Main Branch',
-    city: 'New York',
-    state: 'NY',
-    manager: 'John Smith',
-    phone: '+1 (555) 123-4567',
-    status: 'active',
-    inventory_value: 125000,
-    sales_mtd: 45230
-  },
-  {
-    id: '2',
-    name: 'Downtown Store',
-    city: 'Los Angeles',
-    state: 'CA',
-    manager: 'Sarah Johnson',
-    phone: '+1 (555) 987-6543',
-    status: 'active',
-    inventory_value: 89000,
-    sales_mtd: 32150
-  },
-  {
-    id: '3',
-    name: 'Uptown Branch',
-    city: 'Chicago',
-    state: 'IL',
-    manager: 'Mike Wilson',
-    phone: '+1 (555) 456-7890',
-    status: 'active',
-    inventory_value: 67000,
-    sales_mtd: 28900
-  }
-];
+const branchSchema = z.object({
+  name: z.string().min(2, 'Branch name must be at least 2 characters'),
+  address: z.string().min(5, 'Address must be at least 5 characters'),
+  city: z.string().min(2, 'City must be at least 2 characters'),
+  state: z.string().min(2, 'State must be at least 2 characters'),
+  postal_code: z.string().min(3, 'Postal code must be at least 3 characters'),
+  phone: z.string().min(10, 'Valid phone number required'),
+});
 
 export const BranchesList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingBranch, setEditingBranch] = useState<any>(null);
   const navigate = useNavigate();
 
-  const filteredBranches = sampleBranches.filter(branch =>
+  const { data: branches = [], isLoading } = useBranches();
+  const createBranch = useCreateBranch();
+  const updateBranch = useUpdateBranch();
+
+  const form = useForm({
+    resolver: zodResolver(branchSchema),
+    defaultValues: {
+      name: '',
+      address: '',
+      city: '',
+      state: '',
+      postal_code: '',
+      phone: '',
+    }
+  });
+
+  const filteredBranches = branches.filter(branch =>
     branch.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     branch.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    branch.manager.toLowerCase().includes(searchTerm.toLowerCase())
+    branch.phone.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleCreateBranch = async (data: any) => {
+    try {
+      if (editingBranch) {
+        await updateBranch.mutateAsync({
+          id: editingBranch.id,
+          updates: data
+        });
+      } else {
+        await createBranch.mutateAsync({
+          ...data,
+          company_id: 'demo-company-id',
+          active: true,
+        });
+      }
+      setShowCreateModal(false);
+      setEditingBranch(null);
+      form.reset();
+    } catch (error) {
+      console.error('Error saving branch:', error);
+    }
+  };
+
+  const handleEditBranch = (branch: any) => {
+    setEditingBranch(branch);
+    form.reset({
+      name: branch.name,
+      address: branch.address,
+      city: branch.city,
+      state: branch.state,
+      postal_code: branch.postal_code,
+      phone: branch.phone,
+    });
+    setShowCreateModal(true);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
@@ -98,7 +127,6 @@ export const BranchesList: React.FC = () => {
           <div
             key={branch.id}
             className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-all duration-200 cursor-pointer"
-            onClick={() => navigate(`/branches/${branch.id}`)}
           >
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center space-x-3">
@@ -114,7 +142,10 @@ export const BranchesList: React.FC = () => {
                 </div>
               </div>
               <div className="relative">
-                <button className="p-1 text-gray-400 hover:text-gray-600 transition-colors">
+                <button 
+                  onClick={() => handleEditBranch(branch)}
+                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                >
                   <MoreHorizontal className="w-4 h-4" />
                 </button>
               </div>
@@ -122,12 +153,12 @@ export const BranchesList: React.FC = () => {
 
             <div className="space-y-3">
               <div className="flex items-center space-x-2 text-sm text-gray-600">
-                <User className="w-4 h-4" />
-                <span>Manager: {branch.manager}</span>
-              </div>
-              <div className="flex items-center space-x-2 text-sm text-gray-600">
                 <Phone className="w-4 h-4" />
                 <span>{branch.phone}</span>
+              </div>
+              <div className="flex items-center space-x-2 text-sm text-gray-600">
+                <MapPin className="w-4 h-4" />
+                <span>{branch.address}</span>
               </div>
             </div>
 
@@ -135,28 +166,28 @@ export const BranchesList: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs text-gray-500">Inventory Value</p>
-                  <p className="font-semibold text-gray-900">${branch.inventory_value.toLocaleString()}</p>
+                  <p className="font-semibold text-gray-900">$125,000</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Sales MTD</p>
-                  <p className="font-semibold text-green-600">${branch.sales_mtd.toLocaleString()}</p>
+                  <p className="font-semibold text-green-600">$45,230</p>
                 </div>
               </div>
             </div>
 
             <div className="mt-4 flex items-center justify-between">
               <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                branch.status === 'active' 
+                branch.active 
                   ? 'bg-green-100 text-green-800' 
                   : 'bg-gray-100 text-gray-800'
               }`}>
-                {branch.status}
+                {branch.active ? 'active' : 'inactive'}
               </span>
               <div className="flex items-center space-x-2">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    navigate(`/branches/${branch.id}/edit`);
+                    handleEditBranch(branch);
                   }}
                   className="p-1 text-gray-400 hover:text-indigo-600 transition-colors"
                 >
@@ -165,7 +196,12 @@ export const BranchesList: React.FC = () => {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    // Handle delete
+                    if (confirm('Are you sure you want to deactivate this branch?')) {
+                      updateBranch.mutate({
+                        id: branch.id,
+                        updates: { active: false }
+                      });
+                    }
                   }}
                   className="p-1 text-gray-400 hover:text-red-600 transition-colors"
                 >
@@ -178,72 +214,109 @@ export const BranchesList: React.FC = () => {
       </div>
 
       {/* Create Branch Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Branch</h3>
-            <form className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Branch Name</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  placeholder="Enter branch name"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-                <textarea
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  rows={3}
-                  placeholder="Enter full address"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
-                  <input
-                    type="text"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    placeholder="City"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
-                  <input
-                    type="text"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    placeholder="State"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                <input
-                  type="tel"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  placeholder="+1 (555) 123-4567"
-                />
-              </div>
-              <div className="flex space-x-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                >
-                  Create Branch
-                </button>
-              </div>
-            </form>
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => {
+          setShowCreateModal(false);
+          setEditingBranch(null);
+          form.reset();
+        }}
+        title={editingBranch ? 'Edit Branch' : 'Add New Branch'}
+      >
+        <form onSubmit={form.handleSubmit(handleCreateBranch)} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Branch Name *</label>
+            <input
+              {...form.register('name')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              placeholder="Enter branch name"
+            />
+            {form.formState.errors.name && (
+              <p className="text-red-500 text-sm mt-1">{form.formState.errors.name.message}</p>
+            )}
           </div>
-        </div>
-      )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Address *</label>
+            <textarea
+              {...form.register('address')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              rows={3}
+              placeholder="Enter full address"
+            />
+            {form.formState.errors.address && (
+              <p className="text-red-500 text-sm mt-1">{form.formState.errors.address.message}</p>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">City *</label>
+              <input
+                {...form.register('city')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                placeholder="City"
+              />
+              {form.formState.errors.city && (
+                <p className="text-red-500 text-sm mt-1">{form.formState.errors.city.message}</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">State *</label>
+              <input
+                {...form.register('state')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                placeholder="State"
+              />
+              {form.formState.errors.state && (
+                <p className="text-red-500 text-sm mt-1">{form.formState.errors.state.message}</p>
+              )}
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Postal Code *</label>
+            <input
+              {...form.register('postal_code')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              placeholder="12345"
+            />
+            {form.formState.errors.postal_code && (
+              <p className="text-red-500 text-sm mt-1">{form.formState.errors.postal_code.message}</p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
+            <input
+              {...form.register('phone')}
+              type="tel"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              placeholder="+1 (555) 123-4567"
+            />
+            {form.formState.errors.phone && (
+              <p className="text-red-500 text-sm mt-1">{form.formState.errors.phone.message}</p>
+            )}
+          </div>
+          <div className="flex space-x-3 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowCreateModal(false);
+                setEditingBranch(null);
+                form.reset();
+              }}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              loading={createBranch.isPending || updateBranch.isPending}
+              className="flex-1"
+            >
+              {editingBranch ? 'Update Branch' : 'Create Branch'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

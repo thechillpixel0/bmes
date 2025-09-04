@@ -1,52 +1,9 @@
 import React, { useState } from 'react';
 import { Plus, Search, Filter, Eye, Edit, Truck, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useOrders, useUpdateOrderStatus } from '../../hooks/useDatabase';
 
-interface Order {
-  id: string;
-  order_number: string;
-  customer: string;
-  branch: string;
-  total: number;
-  status: 'draft' | 'confirmed' | 'reserved' | 'picking' | 'shipped' | 'delivered' | 'invoiced';
-  order_date: string;
-  items_count: number;
-}
-
-const sampleOrders: Order[] = [
-  {
-    id: '1',
-    order_number: 'SO-001234',
-    customer: 'Acme Corporation',
-    branch: 'Main Branch',
-    total: 1250.00,
-    status: 'confirmed',
-    order_date: '2025-01-15',
-    items_count: 5
-  },
-  {
-    id: '2',
-    order_number: 'SO-001235',
-    customer: 'Tech Solutions Inc',
-    branch: 'Downtown',
-    total: 850.00,
-    status: 'shipped',
-    order_date: '2025-01-14',
-    items_count: 3
-  },
-  {
-    id: '3',
-    order_number: 'SO-001236',
-    customer: 'Global Enterprises',
-    branch: 'Main Branch',
-    total: 2100.00,
-    status: 'picking',
-    order_date: '2025-01-13',
-    items_count: 8
-  }
-];
-
-const getStatusColor = (status: Order['status']) => {
+const getStatusColor = (status: string) => {
   switch (status) {
     case 'draft':
       return 'bg-gray-100 text-gray-800';
@@ -72,12 +29,31 @@ export const OrdersList: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const navigate = useNavigate();
 
-  const filteredOrders = sampleOrders.filter(order => {
-    const matchesSearch = order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         order.customer.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = !statusFilter || order.status === statusFilter;
-    return matchesSearch && matchesStatus;
+  const { data: orders = [], isLoading } = useOrders({
+    search: searchTerm,
+    status: statusFilter || undefined
   });
+  const updateOrderStatus = useUpdateOrderStatus();
+
+  const filteredOrders = orders.filter(order => {
+    const matchesSearch = order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         order.customer?.name.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesSearch;
+  });
+
+  const handleStatusUpdate = (orderId: string, newStatus: string) => {
+    updateOrderStatus.mutate({ id: orderId, status: newStatus });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
@@ -147,13 +123,13 @@ export const OrdersList: React.FC = () => {
                   <td className="py-4 px-6">
                     <div>
                       <p className="font-medium text-gray-900">{order.order_number}</p>
-                      <p className="text-sm text-gray-500">{order.items_count} items</p>
+                      <p className="text-sm text-gray-500">{new Date(order.order_date).toLocaleDateString()}</p>
                     </div>
                   </td>
-                  <td className="py-4 px-6 text-gray-900">{order.customer}</td>
-                  <td className="py-4 px-6 text-gray-600">{order.branch}</td>
+                  <td className="py-4 px-6 text-gray-900">{order.customer?.name}</td>
+                  <td className="py-4 px-6 text-gray-600">{order.branch?.name}</td>
                   <td className="py-4 px-6 text-right font-medium text-gray-900">
-                    ${order.total.toFixed(2)}
+                    ${order.total_amount.toFixed(2)}
                   </td>
                   <td className="py-4 px-6 text-center">
                     <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(order.status)}`}>
@@ -161,7 +137,7 @@ export const OrdersList: React.FC = () => {
                     </span>
                   </td>
                   <td className="py-4 px-6 text-gray-600">
-                    {new Date(order.order_date).toLocaleDateString()}
+                    {new Date(order.created_at).toLocaleDateString()}
                   </td>
                   <td className="py-4 px-6 text-center">
                     <div className="flex items-center justify-center space-x-2">
@@ -181,6 +157,7 @@ export const OrdersList: React.FC = () => {
                       </button>
                       {order.status === 'confirmed' && (
                         <button
+                          onClick={() => handleStatusUpdate(order.id, 'shipped')}
                           className="p-1 text-gray-400 hover:text-green-600 transition-colors"
                           title="Ship Order"
                         >
@@ -189,6 +166,7 @@ export const OrdersList: React.FC = () => {
                       )}
                       {order.status === 'delivered' && (
                         <button
+                          onClick={() => handleStatusUpdate(order.id, 'invoiced')}
                           className="p-1 text-gray-400 hover:text-purple-600 transition-colors"
                           title="Create Invoice"
                         >

@@ -1,81 +1,18 @@
 import React, { useState } from 'react';
 import { Search, Filter, AlertTriangle, TrendingDown, Package, RefreshCw } from 'lucide-react';
+import { useStockLevels, useBranches, useStockAdjustment } from '../../hooks/useDatabase';
+import { Modal } from '../../components/UI/Modal';
+import { Button } from '../../components/UI/Button';
+import { useForm } from 'react-hook-form';
 
-interface StockItem {
-  id: string;
-  sku: string;
-  product_name: string;
-  branch: string;
-  warehouse: string;
-  bin: string;
-  qty_on_hand: number;
-  qty_reserved: number;
-  qty_available: number;
-  reorder_point: number;
-  last_movement: string;
-  status: 'good' | 'low' | 'critical' | 'out';
-}
+const getStockStatus = (qtyAvailable: number, reorderPoint: number) => {
+  if (qtyAvailable <= 0) return 'out';
+  if (qtyAvailable <= reorderPoint * 0.5) return 'critical';
+  if (qtyAvailable <= reorderPoint) return 'low';
+  return 'good';
+};
 
-const sampleStock: StockItem[] = [
-  {
-    id: '1',
-    sku: 'SKU-001',
-    product_name: 'Wireless Bluetooth Headphones',
-    branch: 'Main Branch',
-    warehouse: 'WH-001',
-    bin: 'A-01-01',
-    qty_on_hand: 150,
-    qty_reserved: 25,
-    qty_available: 125,
-    reorder_point: 50,
-    last_movement: '2025-01-14',
-    status: 'good'
-  },
-  {
-    id: '2',
-    sku: 'SKU-002',
-    product_name: 'Organic Coffee Beans',
-    branch: 'Downtown',
-    warehouse: 'WH-002',
-    bin: 'B-02-03',
-    qty_on_hand: 15,
-    qty_reserved: 5,
-    qty_available: 10,
-    reorder_point: 25,
-    last_movement: '2025-01-13',
-    status: 'low'
-  },
-  {
-    id: '3',
-    sku: 'SKU-003',
-    product_name: 'Cotton T-Shirt',
-    branch: 'Main Branch',
-    warehouse: 'WH-001',
-    bin: 'C-01-05',
-    qty_on_hand: 5,
-    qty_reserved: 3,
-    qty_available: 2,
-    reorder_point: 20,
-    last_movement: '2025-01-12',
-    status: 'critical'
-  },
-  {
-    id: '4',
-    sku: 'SKU-004',
-    product_name: 'Stainless Steel Water Bottle',
-    branch: 'Uptown',
-    warehouse: 'WH-003',
-    bin: 'A-03-02',
-    qty_on_hand: 0,
-    qty_reserved: 0,
-    qty_available: 0,
-    reorder_point: 15,
-    last_movement: '2025-01-10',
-    status: 'out'
-  }
-];
-
-const getStatusIcon = (status: StockItem['status']) => {
+const getStatusIcon = (status: string) => {
   switch (status) {
     case 'critical':
     case 'out':
@@ -87,7 +24,7 @@ const getStatusIcon = (status: StockItem['status']) => {
   }
 };
 
-const getStatusColor = (status: StockItem['status']) => {
+const getStatusColor = (status: string) => {
   switch (status) {
     case 'good':
       return 'bg-green-100 text-green-800';
@@ -106,26 +43,81 @@ export const StockLevels: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [branchFilter, setBranchFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [adjustingStock, setAdjustingStock] = useState<any>(null);
 
-  const branches = ['All', 'Main Branch', 'Downtown', 'Uptown'];
+  const { data: stockLevels = [], isLoading, refetch } = useStockLevels({
+    branch_id: branchFilter || undefined
+  });
+  const { data: branches = [] } = useBranches();
+  const stockAdjustment = useStockAdjustment();
+
+  const adjustForm = useForm({
+    defaultValues: {
+      adjustment_type: 'adjustment',
+      qty_change: 0,
+      notes: '',
+    }
+  });
+
   const statuses = ['All', 'Good', 'Low', 'Critical', 'Out of Stock'];
 
-  const filteredStock = sampleStock.filter(item => {
-    const matchesSearch = item.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.product_name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesBranch = !branchFilter || branchFilter === 'All' || item.branch === branchFilter;
+  const filteredStock = stockLevels.filter(item => {
+    const matchesSearch = item.product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         item.product.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesBranch = !branchFilter || item.branch.id === branchFilter;
+    const status = getStockStatus(item.qty_available, item.product.reorder_point);
     const matchesStatus = !statusFilter || statusFilter === 'All' || 
-                         item.status === statusFilter.toLowerCase().replace(' ', '');
+                         status === statusFilter.toLowerCase().replace(' ', '');
     return matchesSearch && matchesBranch && matchesStatus;
   });
 
   const stockSummary = {
-    total_items: sampleStock.length,
-    low_stock: sampleStock.filter(item => item.status === 'low').length,
-    critical: sampleStock.filter(item => item.status === 'critical').length,
-    out_of_stock: sampleStock.filter(item => item.status === 'out').length,
-    total_value: sampleStock.reduce((sum, item) => sum + (item.qty_on_hand * 25), 0) // Estimated value
+    total_items: stockLevels.length,
+    low_stock: stockLevels.filter(item => getStockStatus(item.qty_available, item.product.reorder_point) === 'low').length,
+    critical: stockLevels.filter(item => getStockStatus(item.qty_available, item.product.reorder_point) === 'critical').length,
+    out_of_stock: stockLevels.filter(item => getStockStatus(item.qty_available, item.product.reorder_point) === 'out').length,
+    total_value: stockLevels.reduce((sum, item) => sum + (item.qty_on_hand * item.product.cost), 0)
   };
+
+  const handleStockAdjustment = (stockItem: any) => {
+    setAdjustingStock(stockItem);
+    adjustForm.reset({
+      adjustment_type: 'adjustment',
+      qty_change: 0,
+      notes: '',
+    });
+    setShowAdjustModal(true);
+  };
+
+  const handleAdjustSubmit = async (data: any) => {
+    if (!adjustingStock) return;
+
+    try {
+      await stockAdjustment.mutateAsync({
+        productId: adjustingStock.product_id,
+        branchId: adjustingStock.branch_id,
+        qtyChange: data.qty_change,
+        movementType: data.adjustment_type,
+        notes: data.notes,
+      });
+      setShowAdjustModal(false);
+      setAdjustingStock(null);
+      adjustForm.reset();
+    } catch (error) {
+      console.error('Error adjusting stock:', error);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
@@ -140,7 +132,10 @@ export const StockLevels: React.FC = () => {
             <RefreshCw className="w-4 h-4" />
             <span>Sync Stock</span>
           </button>
-          <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+          <button 
+            onClick={() => refetch()}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+          >
             Stock Adjustment
           </button>
         </div>
@@ -195,6 +190,85 @@ export const StockLevels: React.FC = () => {
         </div>
       </div>
 
+      {/* Stock Adjustment Modal */}
+      <Modal
+        isOpen={showAdjustModal}
+        onClose={() => {
+          setShowAdjustModal(false);
+          setAdjustingStock(null);
+          adjustForm.reset();
+        }}
+        title="Adjust Stock Level"
+      >
+        {adjustingStock && (
+          <form onSubmit={adjustForm.handleSubmit(handleAdjustSubmit)} className="space-y-4">
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h4 className="font-medium text-gray-900">{adjustingStock.product.name}</h4>
+              <p className="text-sm text-gray-600">SKU: {adjustingStock.product.sku}</p>
+              <p className="text-sm text-gray-600">Current Stock: {adjustingStock.qty_on_hand}</p>
+              <p className="text-sm text-gray-600">Available: {adjustingStock.qty_available}</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Adjustment Type</label>
+              <select
+                {...adjustForm.register('adjustment_type')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              >
+                <option value="adjustment">Stock Adjustment</option>
+                <option value="in">Stock In</option>
+                <option value="out">Stock Out</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Quantity Change</label>
+              <input
+                {...adjustForm.register('qty_change', { valueAsNumber: true })}
+                type="number"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                placeholder="Enter positive or negative number"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Use positive numbers to increase stock, negative to decrease
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+              <textarea
+                {...adjustForm.register('notes')}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                placeholder="Reason for adjustment (optional)"
+              />
+            </div>
+
+            <div className="flex space-x-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowAdjustModal(false);
+                  setAdjustingStock(null);
+                  adjustForm.reset();
+                }}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                loading={stockAdjustment.isPending}
+                className="flex-1"
+              >
+                Adjust Stock
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -213,9 +287,10 @@ export const StockLevels: React.FC = () => {
             onChange={(e) => setBranchFilter(e.target.value)}
             className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
           >
+            <option value="">All Branches</option>
             {branches.map(branch => (
-              <option key={branch} value={branch === 'All' ? '' : branch}>
-                {branch}
+              <option key={branch.id} value={branch.id}>
+                {branch.name}
               </option>
             ))}
           </select>
@@ -251,7 +326,8 @@ export const StockLevels: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-gray-200">
               {filteredStock.map((item) => {
-                const StatusIcon = getStatusIcon(item.status);
+                const status = getStockStatus(item.qty_available, item.product.reorder_point);
+                const StatusIcon = getStatusIcon(status);
                 return (
                   <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                     <td className="py-4 px-6">
@@ -260,26 +336,33 @@ export const StockLevels: React.FC = () => {
                         <p className="text-sm text-gray-500 font-mono">{item.sku}</p>
                       </div>
                     </td>
-                    <td className="py-4 px-6">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{item.branch}</p>
-                        <p className="text-xs text-gray-500">{item.warehouse} • {item.bin}</p>
+                          <p className="font-medium text-gray-900">{item.product.name}</p>
+                          <p className="text-sm text-gray-500 font-mono">{item.product.sku}</p>
+                        <p className="text-sm font-medium text-gray-900">{item.branch.name}</p>
+                        <p className="text-xs text-gray-500">{item.warehouse_code || 'MAIN'} • {item.bin_location || 'A-01-01'}</p>
                       </div>
                     </td>
                     <td className="py-4 px-6 text-right font-medium text-gray-900">{item.qty_on_hand}</td>
                     <td className="py-4 px-6 text-right text-orange-600">{item.qty_reserved}</td>
                     <td className="py-4 px-6 text-right font-medium text-gray-900">{item.qty_available}</td>
-                    <td className="py-4 px-6 text-right text-gray-600">{item.reorder_point}</td>
+                    <td className="py-4 px-6 text-right text-gray-600">{item.product.reorder_point}</td>
                     <td className="py-4 px-6 text-center">
                       <div className="flex items-center justify-center space-x-1">
                         <StatusIcon className="w-4 h-4" />
-                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(item.status)}`}>
-                          {item.status}
+                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(status)}`}>
+                          {status}
                         </span>
+                        <button
+                          onClick={() => handleStockAdjustment(item)}
+                          className="ml-2 p-1 text-gray-400 hover:text-indigo-600 transition-colors"
+                          title="Adjust Stock"
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                        </button>
                       </div>
                     </td>
                     <td className="py-4 px-6 text-gray-600 text-sm">
-                      {new Date(item.last_movement).toLocaleDateString()}
+                      {new Date(item.last_movement_date).toLocaleDateString()}
                     </td>
                   </tr>
                 );

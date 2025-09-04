@@ -1,80 +1,100 @@
 import React, { useState } from 'react';
 import { Plus, Search, Filter, Download, Upload, MoreHorizontal, Edit, Trash2, BarChart3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useProducts, useUpdateProduct } from '../../hooks/useDatabase';
+import { Modal } from '../../components/UI/Modal';
+import { Button } from '../../components/UI/Button';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import toast from 'react-hot-toast';
 
-interface Product {
-  id: string;
-  sku: string;
-  name: string;
-  category: string;
-  uom: string;
-  cost: number;
-  sale_price: number;
-  stock: number;
-  status: 'active' | 'inactive';
-}
-
-const sampleProducts: Product[] = [
-  {
-    id: '1',
-    sku: 'SKU-001',
-    name: 'Wireless Bluetooth Headphones',
-    category: 'Electronics',
-    uom: 'Each',
-    cost: 45.00,
-    sale_price: 89.99,
-    stock: 150,
-    status: 'active'
-  },
-  {
-    id: '2',
-    sku: 'SKU-002',
-    name: 'Organic Coffee Beans',
-    category: 'Food & Beverage',
-    uom: 'Kg',
-    cost: 12.50,
-    sale_price: 24.99,
-    stock: 75,
-    status: 'active'
-  },
-  {
-    id: '3',
-    sku: 'SKU-003',
-    name: 'Cotton T-Shirt',
-    category: 'Apparel',
-    uom: 'Each',
-    cost: 8.00,
-    sale_price: 19.99,
-    stock: 200,
-    status: 'active'
-  },
-  {
-    id: '4',
-    sku: 'SKU-004',
-    name: 'Stainless Steel Water Bottle',
-    category: 'Home & Garden',
-    uom: 'Each',
-    cost: 15.00,
-    sale_price: 29.99,
-    stock: 5,
-    status: 'active'
-  }
-];
+const productSchema = z.object({
+  sku: z.string().min(3, 'SKU must be at least 3 characters'),
+  name: z.string().min(2, 'Product name must be at least 2 characters'),
+  description: z.string().optional(),
+  uom: z.string().min(1, 'Unit of measure is required'),
+  cost: z.number().min(0, 'Cost must be positive'),
+  sale_price: z.number().min(0, 'Sale price must be positive'),
+  reorder_point: z.number().min(0, 'Reorder point must be positive'),
+});
 
 export const ProductsList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
   const navigate = useNavigate();
+
+  const { data: products = [], isLoading, refetch } = useProducts({
+    search: searchTerm,
+    active: true
+  });
+  const updateProduct = useUpdateProduct();
+
+  const form = useForm({
+    resolver: zodResolver(productSchema),
+    defaultValues: {
+      sku: '',
+      name: '',
+      description: '',
+      uom: 'Each',
+      cost: 0,
+      sale_price: 0,
+      reorder_point: 0,
+    }
+  });
 
   const categories = ['All', 'Electronics', 'Food & Beverage', 'Apparel', 'Home & Garden'];
 
-  const filteredProducts = sampleProducts.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.sku.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = !selectedCategory || selectedCategory === 'All' || product.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+  const filteredProducts = products.filter(product => {
+    const matchesCategory = !selectedCategory || selectedCategory === 'All' || 
+                           (product.category as any)?.name === selectedCategory;
+    return matchesCategory;
   });
+
+  const handleCreateProduct = async (data: any) => {
+    try {
+      await updateProduct.mutateAsync({
+        id: editingProduct?.id || 'new',
+        updates: {
+          ...data,
+          company_id: 'demo-company-id',
+          category_id: 'cat-electronics', // Default category
+        }
+      });
+      setShowCreateModal(false);
+      setEditingProduct(null);
+      form.reset();
+    } catch (error) {
+      console.error('Error saving product:', error);
+    }
+  };
+
+  const handleEditProduct = (product: any) => {
+    setEditingProduct(product);
+    form.reset({
+      sku: product.sku,
+      name: product.name,
+      description: product.description || '',
+      uom: product.uom,
+      cost: product.cost,
+      sale_price: product.sale_price,
+      reorder_point: product.reorder_point,
+    });
+    setShowCreateModal(true);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
@@ -94,7 +114,7 @@ export const ProductsList: React.FC = () => {
             <span>Export</span>
           </button>
           <button
-            onClick={() => navigate('/products/new')}
+            onClick={() => setShowCreateModal(true)}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
           >
             <Plus className="w-4 h-4" />
@@ -198,7 +218,7 @@ export const ProductsList: React.FC = () => {
                   <td className="py-4 px-6">
                     <div className="flex items-center space-x-3">
                       <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center">
-                        <Package className="w-5 h-5 text-gray-500" />
+                        <BarChart3 className="w-5 h-5 text-gray-500" />
                       </div>
                       <div>
                         <p className="font-medium text-gray-900">{product.name}</p>
@@ -206,32 +226,24 @@ export const ProductsList: React.FC = () => {
                     </div>
                   </td>
                   <td className="py-4 px-6 text-gray-600 font-mono">{product.sku}</td>
-                  <td className="py-4 px-6 text-gray-600">{product.category}</td>
+                  <td className="py-4 px-6 text-gray-600">{(product.category as any)?.name || 'Uncategorized'}</td>
                   <td className="py-4 px-6 text-gray-600">{product.uom}</td>
                   <td className="py-4 px-6 text-right text-gray-900">${product.cost.toFixed(2)}</td>
                   <td className="py-4 px-6 text-right font-medium text-gray-900">${product.sale_price.toFixed(2)}</td>
-                  <td className="py-4 px-6 text-right">
-                    <span className={`font-medium ${
-                      product.stock < 10 ? 'text-red-600' : 
-                      product.stock < 50 ? 'text-orange-600' : 
-                      'text-green-600'
-                    }`}>
-                      {product.stock}
-                    </span>
-                  </td>
+                  <td className="py-4 px-6 text-right font-medium text-gray-900">-</td>
                   <td className="py-4 px-6 text-center">
                     <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                      product.status === 'active' 
+                      product.is_active 
                         ? 'bg-green-100 text-green-800' 
                         : 'bg-gray-100 text-gray-800'
                     }`}>
-                      {product.status}
+                      {product.is_active ? 'active' : 'inactive'}
                     </span>
                   </td>
                   <td className="py-4 px-6 text-center">
                     <div className="flex items-center justify-center space-x-2">
                       <button
-                        onClick={() => navigate(`/products/${product.id}`)}
+                        onClick={() => handleEditProduct(product)}
                         className="p-1 text-gray-400 hover:text-indigo-600 transition-colors"
                       >
                         <Edit className="w-4 h-4" />
@@ -239,7 +251,17 @@ export const ProductsList: React.FC = () => {
                       <button className="p-1 text-gray-400 hover:text-green-600 transition-colors">
                         <BarChart3 className="w-4 h-4" />
                       </button>
-                      <button className="p-1 text-gray-400 hover:text-red-600 transition-colors">
+                      <button 
+                        onClick={() => {
+                          if (confirm('Are you sure you want to deactivate this product?')) {
+                            updateProduct.mutate({
+                              id: product.id,
+                              updates: { is_active: false }
+                            });
+                          }
+                        }}
+                        className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                      >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -268,6 +290,132 @@ export const ProductsList: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Create/Edit Product Modal */}
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => {
+          setShowCreateModal(false);
+          setEditingProduct(null);
+          form.reset();
+        }}
+        title={editingProduct ? 'Edit Product' : 'Create New Product'}
+        size="lg"
+      >
+        <form onSubmit={form.handleSubmit(handleCreateProduct)} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">SKU *</label>
+              <input
+                {...form.register('sku')}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                placeholder="e.g., SKU-001"
+              />
+              {form.formState.errors.sku && (
+                <p className="text-red-500 text-sm mt-1">{form.formState.errors.sku.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Unit of Measure *</label>
+              <select
+                {...form.register('uom')}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              >
+                <option value="Each">Each</option>
+                <option value="Kg">Kilogram</option>
+                <option value="Lb">Pound</option>
+                <option value="L">Liter</option>
+                <option value="M">Meter</option>
+                <option value="Box">Box</option>
+                <option value="Pack">Pack</option>
+              </select>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Product Name *</label>
+              <input
+                {...form.register('name')}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                placeholder="Enter product name"
+              />
+              {form.formState.errors.name && (
+                <p className="text-red-500 text-sm mt-1">{form.formState.errors.name.message}</p>
+              )}
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+              <textarea
+                {...form.register('description')}
+                rows={3}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                placeholder="Product description (optional)"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Cost Price *</label>
+              <input
+                {...form.register('cost', { valueAsNumber: true })}
+                type="number"
+                step="0.01"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                placeholder="0.00"
+              />
+              {form.formState.errors.cost && (
+                <p className="text-red-500 text-sm mt-1">{form.formState.errors.cost.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Sale Price *</label>
+              <input
+                {...form.register('sale_price', { valueAsNumber: true })}
+                type="number"
+                step="0.01"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                placeholder="0.00"
+              />
+              {form.formState.errors.sale_price && (
+                <p className="text-red-500 text-sm mt-1">{form.formState.errors.sale_price.message}</p>
+              )}
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Reorder Point</label>
+              <input
+                {...form.register('reorder_point', { valueAsNumber: true })}
+                type="number"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                placeholder="0"
+              />
+            </div>
+          </div>
+
+          <div className="flex space-x-3 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowCreateModal(false);
+                setEditingProduct(null);
+                form.reset();
+              }}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              loading={updateProduct.isPending}
+              className="flex-1"
+            >
+              {editingProduct ? 'Update Product' : 'Create Product'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

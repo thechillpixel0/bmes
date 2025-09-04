@@ -1,43 +1,8 @@
 import React from 'react';
 import { AlertTriangle, Clock, TrendingDown, UserX } from 'lucide-react';
+import { useStockLevels } from '../../hooks/useDatabase';
 
-interface Alert {
-  id: string;
-  type: 'warning' | 'error' | 'info';
-  title: string;
-  description: string;
-  action?: string;
-  actionPath?: string;
-}
-
-const alerts: Alert[] = [
-  {
-    id: '1',
-    type: 'warning',
-    title: 'Low Stock Alert',
-    description: '5 products below reorder point',
-    action: 'View Products',
-    actionPath: '/inventory/levels'
-  },
-  {
-    id: '2',
-    type: 'error',
-    title: 'Overdue Invoices',
-    description: '3 invoices overdue by 30+ days',
-    action: 'View Invoices',
-    actionPath: '/invoices?filter=overdue'
-  },
-  {
-    id: '3',
-    type: 'info',
-    title: 'Pending Approvals',
-    description: '2 purchase orders awaiting approval',
-    action: 'Review',
-    actionPath: '/purchase-orders?filter=pending'
-  }
-];
-
-const getAlertIcon = (type: Alert['type']) => {
+const getAlertIcon = (type: string) => {
   switch (type) {
     case 'warning':
       return AlertTriangle;
@@ -50,7 +15,7 @@ const getAlertIcon = (type: Alert['type']) => {
   }
 };
 
-const getAlertColor = (type: Alert['type']) => {
+const getAlertColor = (type: string) => {
   switch (type) {
     case 'warning':
       return 'bg-orange-50 border-orange-200 text-orange-800';
@@ -64,6 +29,54 @@ const getAlertColor = (type: Alert['type']) => {
 };
 
 export const AlertsCard: React.FC = () => {
+  const { data: stockLevels = [] } = useStockLevels();
+
+  // Generate alerts based on actual data
+  const alerts = [];
+
+  // Low stock alerts
+  const lowStockItems = stockLevels.filter(item => 
+    item.qty_available <= item.product.reorder_point && item.qty_available > 0
+  );
+  
+  const outOfStockItems = stockLevels.filter(item => 
+    item.qty_available <= 0
+  );
+
+  if (lowStockItems.length > 0) {
+    alerts.push({
+      id: 'low-stock',
+      type: 'warning',
+      title: 'Low Stock Alert',
+      description: `${lowStockItems.length} products below reorder point`,
+      action: 'View Inventory',
+      actionPath: '/inventory/levels'
+    });
+  }
+
+  if (outOfStockItems.length > 0) {
+    alerts.push({
+      id: 'out-of-stock',
+      type: 'error',
+      title: 'Out of Stock',
+      description: `${outOfStockItems.length} products out of stock`,
+      action: 'View Inventory',
+      actionPath: '/inventory/levels'
+    });
+  }
+
+  // Add some default alerts if no stock alerts
+  if (alerts.length === 0) {
+    alerts.push({
+      id: 'system-ok',
+      type: 'info',
+      title: 'System Status',
+      description: 'All systems operating normally',
+      action: 'View Dashboard',
+      actionPath: '/dashboard'
+    });
+  }
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
       <div className="flex items-center justify-between mb-6">

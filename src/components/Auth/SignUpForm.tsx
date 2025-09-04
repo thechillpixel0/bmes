@@ -81,22 +81,28 @@ export const SignUpForm: React.FC = () => {
 
     setLoading(true);
     try {
-      const { error } = await signUp(data.email, data.password, {
+      const signUpData = {
         full_name: data.full_name,
         company_name: step1Data.company_name,
         industry: step1Data.industry,
+        company_type: step1Data.company_type,
+        employee_count: step1Data.employee_count,
+        country: step1Data.country,
+        phone: step1Data.phone,
         branch_name: step2Data.branch_name,
         address: step2Data.address,
         city: step2Data.city,
         state: step2Data.state,
         postal_code: step2Data.postal_code,
-        phone: step2Data.branch_phone,
-      });
+        branch_phone: step2Data.branch_phone,
+      };
+
+      const { error } = await signUp(data.email, data.password, signUpData);
 
       if (error) {
         toast.error(error.message);
       } else {
-        toast.success('Account created successfully! Please check your email to verify your account.');
+        toast.success('Account created successfully! Welcome to your business management system.');
       }
     } catch (error) {
       toast.error('An error occurred during registration');

@@ -4,6 +4,8 @@ import { KPICard } from '../components/Dashboard/KPICard';
 import { RecentActivity } from '../components/Dashboard/RecentActivity';
 import { QuickActions } from '../components/Dashboard/QuickActions';
 import { AlertsCard } from '../components/Dashboard/AlertsCard';
+import { useDashboardKPIs, useRecentActivity } from '../hooks/useDatabase';
+import { useAuth } from '../contexts/AuthContext';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
 const salesData = [
@@ -16,13 +18,32 @@ const salesData = [
 ];
 
 export const Dashboard: React.FC = () => {
+  const { company, currentBranch } = useAuth();
+  const { data: kpis, isLoading: kpisLoading } = useDashboardKPIs();
+  const { data: recentActivity, isLoading: activityLoading } = useRecentActivity();
+
+  if (kpisLoading) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6">
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-600">Welcome back! Here's what's happening with your business.</p>
+          <p className="text-gray-600">
+            Welcome back! Here's what's happening with {company?.name || 'your business'}.
+          </p>
+          {currentBranch && (
+            <p className="text-sm text-indigo-600">Current branch: {currentBranch.name}</p>
+          )}
         </div>
         <div className="flex items-center space-x-3">
           <select className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
@@ -38,35 +59,35 @@ export const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <KPICard
           title="Revenue MTD"
-          value="$45,230"
+          value={`$${kpis?.revenue_mtd?.toLocaleString() || '0'}`}
           change="+12.5% from last month"
           changeType="positive"
           icon={DollarSign}
         />
         <KPICard
           title="Accounts Receivable"
-          value="$18,450"
+          value={`$${kpis?.accounts_receivable?.toLocaleString() || '0'}`}
           change="+5.2% from last month"
           changeType="positive"
           icon={TrendingUp}
         />
         <KPICard
           title="Accounts Payable"
-          value="$12,340"
+          value={`$${kpis?.accounts_payable?.toLocaleString() || '0'}`}
           change="-8.1% from last month"
           changeType="positive"
           icon={BarChart3}
         />
         <KPICard
           title="Cash Balance"
-          value="$32,890"
+          value={`$${kpis?.cash_balance?.toLocaleString() || '0'}`}
           change="+15.3% from last month"
           changeType="positive"
           icon={DollarSign}
         />
         <KPICard
           title="Inventory Value"
-          value="$89,560"
+          value={`$${kpis?.inventory_value?.toLocaleString() || '0'}`}
           change="+2.1% from last month"
           changeType="positive"
           icon={Package}

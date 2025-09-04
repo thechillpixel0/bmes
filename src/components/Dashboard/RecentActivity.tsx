@@ -1,51 +1,8 @@
 import React from 'react';
 import { Clock, ShoppingCart, CreditCard, Package, Users } from 'lucide-react';
+import { useRecentActivity } from '../../hooks/useDatabase';
 
-interface Activity {
-  id: string;
-  type: 'order' | 'payment' | 'inventory' | 'user';
-  title: string;
-  description: string;
-  time: string;
-  user: string;
-}
-
-const activities: Activity[] = [
-  {
-    id: '1',
-    type: 'order',
-    title: 'New Order #SO-001234',
-    description: 'Order created for $1,250.00',
-    time: '2 minutes ago',
-    user: 'John Smith'
-  },
-  {
-    id: '2',
-    type: 'payment',
-    title: 'Payment Received',
-    description: 'Invoice #INV-001230 paid $850.00',
-    time: '15 minutes ago',
-    user: 'System'
-  },
-  {
-    id: '3',
-    type: 'inventory',
-    title: 'Stock Alert',
-    description: 'Product SKU-123 below reorder point',
-    time: '1 hour ago',
-    user: 'System'
-  },
-  {
-    id: '4',
-    type: 'user',
-    title: 'New User Added',
-    description: 'Sarah Johnson added to Downtown branch',
-    time: '2 hours ago',
-    user: 'Admin'
-  }
-];
-
-const getActivityIcon = (type: Activity['type']) => {
+const getActivityIcon = (type: string) => {
   switch (type) {
     case 'order':
       return ShoppingCart;
@@ -60,7 +17,7 @@ const getActivityIcon = (type: Activity['type']) => {
   }
 };
 
-const getActivityColor = (type: Activity['type']) => {
+const getActivityColor = (type: string) => {
   switch (type) {
     case 'order':
       return 'bg-blue-50 text-blue-600';
@@ -76,6 +33,29 @@ const getActivityColor = (type: Activity['type']) => {
 };
 
 export const RecentActivity: React.FC = () => {
+  const { data: recentOrders = [], isLoading } = useRecentActivity();
+
+  // Transform orders into activity format
+  const activities = recentOrders.map(order => ({
+    id: order.id,
+    type: 'order',
+    title: `Order ${order.order_number}`,
+    description: `${order.customer?.name} - $${order.total_amount?.toFixed(2)}`,
+    time: new Date(order.created_at).toLocaleDateString(),
+    user: 'System'
+  }));
+
+  if (isLoading) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-6">Recent Activity</h3>
+        <div className="flex items-center justify-center py-8">
+          <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
       <div className="flex items-center justify-between mb-6">
@@ -105,6 +85,11 @@ export const RecentActivity: React.FC = () => {
             </div>
           );
         })}
+        {activities.length === 0 && (
+          <div className="text-center py-8 text-gray-500">
+            No recent activity
+          </div>
+        )}
       </div>
     </div>
   );
