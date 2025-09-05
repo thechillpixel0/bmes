@@ -331,13 +331,18 @@ export const StockLevels: React.FC = () => {
                 return (
                   <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                     <td className="py-4 px-6">
-                      <div>
-                        <p className="font-medium text-gray-900">{item.product_name}</p>
-                        <p className="text-sm text-gray-500 font-mono">{item.sku}</p>
-                      </div>
-                    </td>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center">
+                          <Package className="w-5 h-5 text-gray-500" />
+                        </div>
+                        <div>
                           <p className="font-medium text-gray-900">{item.product.name}</p>
                           <p className="text-sm text-gray-500 font-mono">{item.product.sku}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-4 px-6">
+                      <div>
                         <p className="text-sm font-medium text-gray-900">{item.branch.name}</p>
                         <p className="text-xs text-gray-500">{item.warehouse_code || 'MAIN'} • {item.bin_location || 'A-01-01'}</p>
                       </div>

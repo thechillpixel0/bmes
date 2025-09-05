@@ -1,111 +1,22 @@
 import React, { useState } from 'react';
 import { Plus, Search, Edit, Trash2, ChevronRight, ChevronDown, FolderOpen, Folder } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '../../lib/supabase';
 
-interface Account {
-  id: string;
-  code: string;
-  name: string;
-  type: 'asset' | 'liability' | 'equity' | 'income' | 'expense';
-  parent_id?: string;
-  balance: number;
-  children?: Account[];
-  expanded?: boolean;
-}
+const useChartOfAccounts = () => {
+  return useQuery({
+    queryKey: ['chart-of-accounts'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('chart_of_accounts')
+        .select('*')
+        .order('account_code');
 
-const sampleAccounts: Account[] = [
-  {
-    id: '1',
-    code: '1000',
-    name: 'Assets',
-    type: 'asset',
-    balance: 0,
-    expanded: true,
-    children: [
-      {
-        id: '2',
-        code: '1100',
-        name: 'Current Assets',
-        type: 'asset',
-        parent_id: '1',
-        balance: 0,
-        expanded: true,
-        children: [
-          { id: '3', code: '1110', name: 'Cash and Cash Equivalents', type: 'asset', parent_id: '2', balance: 32890 },
-          { id: '4', code: '1120', name: 'Accounts Receivable', type: 'asset', parent_id: '2', balance: 18450 },
-          { id: '5', code: '1130', name: 'Inventory', type: 'asset', parent_id: '2', balance: 89560 },
-        ]
-      },
-      {
-        id: '6',
-        code: '1200',
-        name: 'Fixed Assets',
-        type: 'asset',
-        parent_id: '1',
-        balance: 0,
-        children: [
-          { id: '7', code: '1210', name: 'Property, Plant & Equipment', type: 'asset', parent_id: '6', balance: 150000 },
-          { id: '8', code: '1220', name: 'Accumulated Depreciation', type: 'asset', parent_id: '6', balance: -25000 },
-        ]
-      }
-    ]
-  },
-  {
-    id: '9',
-    code: '2000',
-    name: 'Liabilities',
-    type: 'liability',
-    balance: 0,
-    expanded: true,
-    children: [
-      {
-        id: '10',
-        code: '2100',
-        name: 'Current Liabilities',
-        type: 'liability',
-        parent_id: '9',
-        balance: 0,
-        children: [
-          { id: '11', code: '2110', name: 'Accounts Payable', type: 'liability', parent_id: '10', balance: 12340 },
-          { id: '12', code: '2120', name: 'Accrued Expenses', type: 'liability', parent_id: '10', balance: 5600 },
-        ]
-      }
-    ]
-  },
-  {
-    id: '13',
-    code: '3000',
-    name: 'Equity',
-    type: 'equity',
-    balance: 0,
-    children: [
-      { id: '14', code: '3100', name: 'Owner\'s Equity', type: 'equity', parent_id: '13', balance: 100000 },
-      { id: '15', code: '3200', name: 'Retained Earnings', type: 'equity', parent_id: '13', balance: 45000 },
-    ]
-  },
-  {
-    id: '16',
-    code: '4000',
-    name: 'Revenue',
-    type: 'income',
-    balance: 0,
-    children: [
-      { id: '17', code: '4100', name: 'Sales Revenue', type: 'income', parent_id: '16', balance: 245000 },
-      { id: '18', code: '4200', name: 'Service Revenue', type: 'income', parent_id: '16', balance: 35000 },
-    ]
-  },
-  {
-    id: '19',
-    code: '5000',
-    name: 'Expenses',
-    type: 'expense',
-    balance: 0,
-    expanded: true,
-    children: [
-      { id: '20', code: '5100', name: 'Cost of Goods Sold', type: 'expense', parent_id: '19', balance: 120000 },
-      { id: '21', code: '5200', name: 'Operating Expenses', type: 'expense', parent_id: '19', balance: 45000 },
-    ]
-  }
-];
+      if (error) throw error;
+      return data || [];
+    },
+  });
+};
 
 const getTypeColor = (type: Account['type']) => {
   switch (type) {
@@ -126,8 +37,10 @@ const getTypeColor = (type: Account['type']) => {
 
 export const ChartOfAccounts: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [expandedAccounts, setExpandedAccounts] = useState<string[]>(['1', '2', '9', '10', '19']);
+  const [expandedAccounts, setExpandedAccounts] = useState<string[]>(['acc-1000', 'acc-1100', 'acc-2000', 'acc-2100', 'acc-5000']);
   const [showCreateModal, setShowCreateModal] = useState(false);
+
+  const { data: accounts = [], isLoading } = useChartOfAccounts();
 
   const toggleExpanded = (accountId: string) => {
     setExpandedAccounts(prev =>
@@ -137,10 +50,42 @@ export const ChartOfAccounts: React.FC = () => {
     );
   };
 
-  const renderAccount = (account: Account, level = 0) => {
+  // Build hierarchical structure
+  const buildAccountTree = (accounts: any[]) => {
+    const accountMap = new Map();
+    const rootAccounts: any[] = [];
+
+    // First pass: create map of all accounts
+    accounts.forEach(account => {
+      accountMap.set(account.id, { ...account, children: [] });
+    });
+
+    // Second pass: build hierarchy
+    accounts.forEach(account => {
+      if (account.parent_id) {
+        const parent = accountMap.get(account.parent_id);
+        if (parent) {
+          parent.children.push(accountMap.get(account.id));
+        }
+      } else {
+        rootAccounts.push(accountMap.get(account.id));
+      }
+    });
+
+    return rootAccounts;
+  };
+
+  const renderAccount = (account: any, level = 0) => {
     const hasChildren = account.children && account.children.length > 0;
     const isExpanded = expandedAccounts.includes(account.id);
     const paddingLeft = level * 24;
+
+    // Calculate balance (for demo, using static values)
+    const balance = account.account_code === '1110' ? 32890 :
+                   account.account_code === '1120' ? 18450 :
+                   account.account_code === '1130' ? 89560 :
+                   account.account_code === '2110' ? 12340 :
+                   0;
 
     return (
       <React.Fragment key={account.id}>
@@ -167,16 +112,16 @@ export const ChartOfAccounts: React.FC = () => {
                 <Folder className="w-4 h-4 text-gray-400" />
               )}
               <span className="font-mono text-sm text-gray-600">{account.code}</span>
-              <span className="font-medium text-gray-900">{account.name}</span>
+              <span className="font-medium text-gray-900">{account.account_name}</span>
             </div>
           </td>
           <td className="py-3 px-6">
-            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getTypeColor(account.type)}`}>
-              {account.type}
+            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getTypeColor(account.account_type)}`}>
+              {account.account_type}
             </span>
           </td>
           <td className="py-3 px-6 text-right font-medium text-gray-900">
-            ${account.balance.toLocaleString()}
+            ${balance.toLocaleString()}
           </td>
           <td className="py-3 px-6 text-center">
             <div className="flex items-center justify-center space-x-2">
@@ -195,6 +140,18 @@ export const ChartOfAccounts: React.FC = () => {
       </React.Fragment>
     );
   };
+
+  const accountTree = buildAccountTree(accounts);
+
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
@@ -244,7 +201,7 @@ export const ChartOfAccounts: React.FC = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {sampleAccounts.map(account => renderAccount(account))}
+            {accountTree.map(account => renderAccount(account))}
           </tbody>
         </table>
       </div>

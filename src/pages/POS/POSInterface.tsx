@@ -1,24 +1,17 @@
 import React, { useState } from 'react';
 import { Search, ShoppingCart, CreditCard, DollarSign, Percent, Trash2, Plus, Minus } from 'lucide-react';
-import { useProducts, useCustomers, useCreateOrder } from '../../hooks/useDatabase';
-import { useAuth } from '../../contexts/AuthContext';
-import toast from 'react-hot-toast';
-
-interface CartItem {
-  id: string;
-  sku: string;
-  name: string;
-  price: number;
-  quantity: number;
-  total: number;
-}
-
 export const POSInterface: React.FC = () => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [discount, setDiscount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'digital'>('cash');
   const [selectedCustomer, setSelectedCustomer] = useState<string>('');
+  const [selectedCustomer, setSelectedCustomer] = useState<string>('');
+
+  const { currentBranch } = useAuth();
+  const { data: products = [] } = useProducts({ search: searchTerm, active: true });
+  const { data: customers = [] } = useCustomers({ active: true });
+  const createOrder = useCreateOrder();
 
   const { currentBranch } = useAuth();
   const { data: products = [] } = useProducts({ search: searchTerm, active: true });
@@ -105,6 +98,30 @@ export const POSInterface: React.FC = () => {
         setSelectedCustomer('');
       }
     });
+      toast.error('No branch selected');
+      return;
+    }
+
+    const orderData = {
+      customer_id: selectedCustomer,
+      branch_id: currentBranch.id,
+      notes: `POS Sale - ${paymentMethod} payment`,
+      lines: cart.map(item => ({
+        product_id: item.id,
+        qty: item.quantity,
+        unit_price: item.price,
+        discount_pct: 0,
+      }))
+    };
+
+    createOrder.mutate(orderData, {
+      onSuccess: () => {
+        toast.success(`Order completed! Total: $${total.toFixed(2)}`);
+        setCart([]);
+        setDiscount(0);
+        setSelectedCustomer('');
+      }
+    });
   };
 
   return (
@@ -134,10 +151,6 @@ export const POSInterface: React.FC = () => {
             >
               <div className="w-full h-24 bg-gray-100 rounded-lg mb-3 flex items-center justify-center">
                 <div className="w-8 h-8 bg-gray-300 rounded"></div>
-              </div>
-              <h3 className="font-medium text-gray-900 text-sm mb-1 line-clamp-2">{product.name}</h3>
-              <p className="text-xs text-gray-500 mb-2">{product.sku}</p>
-              <div className="flex items-center justify-between">
                 <span className="text-lg font-bold text-indigo-600">${product.sale_price}</span>
                 <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-600">
                   In Stock
@@ -219,6 +232,23 @@ export const POSInterface: React.FC = () => {
               </select>
             </div>
 
+            {/* Customer Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Customer</label>
+              <select
+                value={selectedCustomer}
+                onChange={(e) => setSelectedCustomer(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              >
+                <option value="">Select Customer</option>
+                {customers.map(customer => (
+                  <option key={customer.id} value={customer.id}>
+                    {customer.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Discount */}
             <div className="flex items-center space-x-2">
               <Percent className="w-4 h-4 text-gray-400" />
@@ -282,9 +312,14 @@ export const POSInterface: React.FC = () => {
             <button
               onClick={handleCheckout}
               disabled={cart.length === 0 || !selectedCustomer || createOrder.isPending}
+              disabled={cart.length === 0 || !selectedCustomer || createOrder.isPending}
               className="w-full bg-indigo-600 text-white py-4 rounded-lg hover:bg-indigo-700 transition-colors font-medium text-lg"
             >
               {createOrder.isPending ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto" />
+              ) : (
+                `Complete Sale - $${total.toFixed(2)}`
+              )}
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto" />
               ) : (
                 `Complete Sale - $${total.toFixed(2)}`

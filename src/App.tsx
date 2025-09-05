@@ -12,6 +12,7 @@ import { ProductsList } from './pages/Products/ProductsList';
 import { POSInterface } from './pages/POS/POSInterface';
 import { BranchesList } from './pages/Branches/BranchesList';
 import { OrdersList } from './pages/Orders/OrdersList';
+import { CreateOrder } from './pages/Orders/CreateOrder';
 import { StockLevels } from './pages/Inventory/StockLevels';
 import { ChartOfAccounts } from './pages/Finance/ChartOfAccounts';
 
@@ -55,6 +56,7 @@ const AppRoutes: React.FC = () => {
         <Route path="products" element={<ProductsList />} />
         <Route path="pos" element={<POSInterface />} />
         <Route path="orders" element={<OrdersList />} />
+        <Route path="orders/new" element={<CreateOrder />} />
         <Route path="inventory/levels" element={<StockLevels />} />
         <Route path="finance/coa" element={<ChartOfAccounts />} />
         

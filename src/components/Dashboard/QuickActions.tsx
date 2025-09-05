@@ -15,7 +15,7 @@ const quickActions: QuickAction[] = [
     name: 'Create Invoice',
     description: 'Generate new invoice',
     icon: FileText,
-    path: '/invoices/new',
+    path: '/invoices',
     color: 'bg-blue-50 text-blue-600 hover:bg-blue-100'
   },
   {
@@ -29,14 +29,14 @@ const quickActions: QuickAction[] = [
     name: 'Add Product',
     description: 'Create new product',
     icon: Package,
-    path: '/products/new',
+    path: '/products',
     color: 'bg-purple-50 text-purple-600 hover:bg-purple-100'
   },
   {
     name: 'New Order',
     description: 'Create sales order',
     icon: ShoppingCart,
-    path: '/orders/new',
+    path: '/orders',
     color: 'bg-orange-50 text-orange-600 hover:bg-orange-100'
   }
 ];
