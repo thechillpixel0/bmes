@@ -7,6 +7,12 @@ import { Button } from '../../components/UI/Button';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useBranches, useCreateBranch, useUpdateBranch } from '../../hooks/useDatabase';
+import { Modal } from '../../components/UI/Modal';
+import { Button } from '../../components/UI/Button';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 
 const branchSchema = z.object({
   name: z.string().min(2, 'Branch name must be at least 2 characters'),
@@ -20,6 +26,7 @@ const branchSchema = z.object({
 export const BranchesList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingBranch, setEditingBranch] = useState<any>(null);
   const [editingBranch, setEditingBranch] = useState<any>(null);
   const navigate = useNavigate();
 
@@ -40,10 +47,71 @@ export const BranchesList: React.FC = () => {
   });
 
   const filteredBranches = branches.filter(branch =>
+  const createBranch = useCreateBranch();
+  const updateBranch = useUpdateBranch();
+
+  const form = useForm({
+    resolver: zodResolver(branchSchema),
+    defaultValues: {
+      name: '',
+      address: '',
+      city: '',
+      state: '',
+      postal_code: '',
+      phone: '',
+    }
+  });
+
+  const filteredBranches = branches.filter(branch =>
     branch.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     branch.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
     branch.phone.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleCreateBranch = async (data: any) => {
+    try {
+      if (editingBranch) {
+        await updateBranch.mutateAsync({
+          id: editingBranch.id,
+          updates: data
+        });
+      } else {
+        await createBranch.mutateAsync({
+          ...data,
+          company_id: 'demo-company-id',
+          active: true,
+        });
+      }
+      setShowCreateModal(false);
+      setEditingBranch(null);
+      form.reset();
+    } catch (error) {
+      console.error('Error saving branch:', error);
+    }
+  };
+
+  const handleEditBranch = (branch: any) => {
+    setEditingBranch(branch);
+    form.reset({
+      name: branch.name,
+      address: branch.address,
+      city: branch.city,
+      state: branch.state,
+      postal_code: branch.postal_code,
+      phone: branch.phone,
+    });
+    setShowCreateModal(true);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      </div>
+    );
+  }
 
   const handleCreateBranch = async (data: any) => {
     try {
@@ -126,7 +194,6 @@ export const BranchesList: React.FC = () => {
         {filteredBranches.map((branch) => (
           <div
             key={branch.id}
-            className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-all duration-200 cursor-pointer"
           >
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center space-x-3">
@@ -146,15 +213,18 @@ export const BranchesList: React.FC = () => {
                   onClick={() => handleEditBranch(branch)}
                   className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
                 >
+                  onClick={() => handleEditBranch(branch)}
+                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                >
                   <MoreHorizontal className="w-4 h-4" />
                 </button>
-              </div>
-            </div>
-
-            <div className="space-y-3">
               <div className="flex items-center space-x-2 text-sm text-gray-600">
                 <Phone className="w-4 h-4" />
                 <span>{branch.phone}</span>
+              </div>
+              <div className="flex items-center space-x-2 text-sm text-gray-600">
+                <MapPin className="w-4 h-4" />
+                <span>{branch.address}</span>
               </div>
               <div className="flex items-center space-x-2 text-sm text-gray-600">
                 <MapPin className="w-4 h-4" />
@@ -196,6 +266,11 @@ export const BranchesList: React.FC = () => {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
+                    if (confirm('Are you sure you want to deactivate this branch?')) {
+                      updateBranch.mutate({
+                        id: branch.id,
+                        updates: { active: false }
+                      });
                     if (confirm('Are you sure you want to deactivate this branch?')) {
                       updateBranch.mutate({
                         id: branch.id,
@@ -317,6 +392,4 @@ export const BranchesList: React.FC = () => {
           </div>
         </form>
       </Modal>
-    </div>
-  );
 };
