@@ -53,7 +53,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.error('Error loading user profile:', error);
         }
       }
-    });
       setUser(user);
       if (user) {
         try {
@@ -88,7 +87,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setCompany(null);
         setCurrentBranch(null);
       }
-    });
       setUser(user);
       if (user) {
         try {
