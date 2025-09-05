@@ -66,7 +66,7 @@ export const BranchesList: React.FC = () => {
     branch.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     branch.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
     branch.phone.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ));
 
   const handleCreateBranch = async (data: any) => {
     try {
@@ -194,6 +194,7 @@ export const BranchesList: React.FC = () => {
         {filteredBranches.map((branch) => (
           <div
             key={branch.id}
+            className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow cursor-pointer"
           >
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center space-x-3">
@@ -213,18 +214,15 @@ export const BranchesList: React.FC = () => {
                   onClick={() => handleEditBranch(branch)}
                   className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
                 >
-                  onClick={() => handleEditBranch(branch)}
-                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                >
                   <MoreHorizontal className="w-4 h-4" />
                 </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
               <div className="flex items-center space-x-2 text-sm text-gray-600">
                 <Phone className="w-4 h-4" />
                 <span>{branch.phone}</span>
-              </div>
-              <div className="flex items-center space-x-2 text-sm text-gray-600">
-                <MapPin className="w-4 h-4" />
-                <span>{branch.address}</span>
               </div>
               <div className="flex items-center space-x-2 text-sm text-gray-600">
                 <MapPin className="w-4 h-4" />
@@ -266,11 +264,6 @@ export const BranchesList: React.FC = () => {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (confirm('Are you sure you want to deactivate this branch?')) {
-                      updateBranch.mutate({
-                        id: branch.id,
-                        updates: { active: false }
-                      });
                     if (confirm('Are you sure you want to deactivate this branch?')) {
                       updateBranch.mutate({
                         id: branch.id,
@@ -392,4 +385,6 @@ export const BranchesList: React.FC = () => {
           </div>
         </form>
       </Modal>
+    </div>
+  );
 };
