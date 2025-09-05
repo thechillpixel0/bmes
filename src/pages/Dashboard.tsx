@@ -60,7 +60,7 @@ export const Dashboard: React.FC = () => {
           {currentBranch && (
             <p className="text-sm text-indigo-600">Current branch: {currentBranch.name}</p>
           )}
-            Welcome back! Here's what's happening with {company?.name || 'your business'}.
+            Welcome back! Here's what\'s happening with {company?.name || 'your business'}.
           </p>
           {currentBranch && (
             <p className="text-sm text-indigo-600">Current branch: {currentBranch.name}</p>
