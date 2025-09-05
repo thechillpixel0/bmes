@@ -1,7 +1,6 @@
 import React from 'react';
 import { AlertTriangle, Clock, TrendingDown, UserX } from 'lucide-react';
 import { useStockLevels } from '../../hooks/useDatabase';
-import { useStockLevels } from '../../hooks/useDatabase';
 
 const getAlertIcon = (type: string) => {
   switch (type) {
@@ -78,27 +77,8 @@ export const AlertsCard: React.FC = () => {
     });
   }
 
-  const { data: stockLevels = [] } = useStockLevels();
-
-  // Generate alerts based on actual data
-  const alerts = [];
-
-  // Low stock alerts
-  const lowStockItems = stockLevels.filter(item => 
-    item.qty_available <= item.product.reorder_point && item.qty_available > 0
-  );
-  
-  const outOfStockItems = stockLevels.filter(item => 
-    item.qty_available <= 0
-  );
-
-  if (lowStockItems.length > 0) {
-    alerts.push({
-      id: 'low-stock',
-      type: 'warning',
-const getAlertIcon = (type: string) => {
-      title: 'Low Stock Alert',
-
+  return (
+    <div>
       <div className="space-y-3">
         {alerts.map((alert) => {
           const Icon = getAlertIcon(alert.type);
