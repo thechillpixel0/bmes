@@ -6,6 +6,8 @@ import { QuickActions } from '../components/Dashboard/QuickActions';
 import { AlertsCard } from '../components/Dashboard/AlertsCard';
 import { useDashboardKPIs, useRecentActivity } from '../hooks/useDatabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useDashboardKPIs, useRecentActivity } from '../hooks/useDatabase';
+import { useAuth } from '../contexts/AuthContext';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
 const salesData = [
@@ -32,6 +34,20 @@ export const Dashboard: React.FC = () => {
     );
   }
 
+  const { company, currentBranch } = useAuth();
+  const { data: kpis, isLoading: kpisLoading } = useDashboardKPIs();
+  const { data: recentActivity, isLoading: activityLoading } = useRecentActivity();
+
+  if (kpisLoading) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6">
       {/* Page Header */}
@@ -39,6 +55,11 @@ export const Dashboard: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-gray-600">
+            Welcome back! Here's what's happening with {company?.name || 'your business'}.
+          </p>
+          {currentBranch && (
+            <p className="text-sm text-indigo-600">Current branch: {currentBranch.name}</p>
+          )}
             Welcome back! Here's what's happening with {company?.name || 'your business'}.
           </p>
           {currentBranch && (

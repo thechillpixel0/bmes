@@ -7,11 +7,14 @@ interface AuthContextType {
   userProfile: User | null;
   company: Company | null;
   currentBranch: Branch | null;
+  company: Company | null;
+  currentBranch: Branch | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<any>;
   signUp: (email: string, password: string, userData: any) => Promise<any>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<any>;
+  setCurrentBranch: (branch: Branch) => void;
   setCurrentBranch: (branch: Branch) => void;
 }
 
@@ -28,6 +31,8 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [userProfile, setUserProfile] = useState<User | null>(null);
+  const [company, setCompany] = useState<Company | null>(null);
+  const [currentBranch, setCurrentBranch] = useState<Branch | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
   const [currentBranch, setCurrentBranch] = useState<Branch | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,9 +54,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
     });
+      setUser(user);
+      if (user) {
+        try {
+          const profile = await authService.getUserProfile();
+          setUserProfile(profile);
+          if (profile) {
+            setCompany(profile.company as Company);
+            setCurrentBranch(profile.branch as Branch);
+          }
+        } catch (error) {
+          console.error('Error loading user profile:', error);
+        }
+      }
+    });
 
     // Listen for auth changes
     const { data: { subscription } } = authService.onAuthStateChange(async (user) => {
+      setUser(user);
+      if (user) {
+        try {
+          const profile = await authService.getUserProfile();
+          setUserProfile(profile);
+          if (profile) {
+            setCompany(profile.company as Company);
+            setCurrentBranch(profile.branch as Branch);
+          }
+        } catch (error) {
+          console.error('Error loading user profile:', error);
+        }
+      } else {
+        setUserProfile(null);
+        setCompany(null);
+        setCurrentBranch(null);
+      }
+    });
       setUser(user);
       if (user) {
         try {
@@ -92,6 +129,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUserProfile(null);
     setCompany(null);
     setCurrentBranch(null);
+    setCompany(null);
+    setCurrentBranch(null);
   };
 
   const resetPassword = async (email: string) => {
@@ -103,11 +142,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     userProfile,
     company,
     currentBranch,
+    company,
+    currentBranch,
     loading,
     signIn,
     signUp,
     signOut,
     resetPassword,
+    setCurrentBranch,
     setCurrentBranch,
   };
 

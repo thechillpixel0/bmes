@@ -89,6 +89,10 @@ export const SignUpForm: React.FC = () => {
         employee_count: step1Data.employee_count,
         country: step1Data.country,
         phone: step1Data.phone,
+        company_type: step1Data.company_type,
+        employee_count: step1Data.employee_count,
+        country: step1Data.country,
+        phone: step1Data.phone,
         branch_name: step2Data.branch_name,
         address: step2Data.address,
         city: step2Data.city,
@@ -96,6 +100,8 @@ export const SignUpForm: React.FC = () => {
         postal_code: step2Data.postal_code,
         branch_phone: step2Data.branch_phone,
       };
+
+      const { error } = await signUp(data.email, data.password, signUpData);
 
       const { error } = await signUp(data.email, data.password, signUpData);
 
